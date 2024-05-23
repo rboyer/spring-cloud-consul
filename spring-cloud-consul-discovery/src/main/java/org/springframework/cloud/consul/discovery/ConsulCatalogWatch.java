@@ -17,6 +17,8 @@
 package org.springframework.cloud.consul.discovery;
 
 import java.math.BigInteger;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
@@ -36,7 +38,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.ApplicationEventPublisherAware;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.Trigger;
+import org.springframework.scheduling.TriggerContext;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.util.backoff.BackOffExecution;
+import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
  * @author Spencer Gibb
@@ -56,6 +62,10 @@ public class ConsulCatalogWatch implements ApplicationEventPublisherAware, Smart
 	private final AtomicBoolean running = new AtomicBoolean(false);
 
 	private ApplicationEventPublisher publisher;
+
+	private final ExponentialBackOff backOff = new ExponentialBackOff(500L, 1.5);
+
+	private LongLivedExponentialBackOffTrigger watchTrigger;
 
 	private ScheduledFuture<?> watchFuture;
 
@@ -94,8 +104,8 @@ public class ConsulCatalogWatch implements ApplicationEventPublisherAware, Smart
 	@Override
 	public void start() {
 		if (this.running.compareAndSet(false, true)) {
-			this.watchFuture = this.taskScheduler.scheduleWithFixedDelay(this::catalogServicesWatch,
-					this.properties.getCatalogServicesWatchDelay());
+			this.watchTrigger = new LongLivedExponentialBackOffTrigger(backOff);
+			this.watchFuture = this.taskScheduler.schedule(this::catalogServicesWatch, this.watchTrigger);
 		}
 	}
 
@@ -118,14 +128,17 @@ public class ConsulCatalogWatch implements ApplicationEventPublisherAware, Smart
 
 	@Timed("consul.watch-catalog-services")
 	public void catalogServicesWatch() {
+		watchTrigger.markStart();
+		boolean success = false;
 		try {
 			long index = -1;
 			if (this.catalogServicesIndex.get() != null) {
 				index = this.catalogServicesIndex.get().longValue();
 			}
 
-			CatalogServicesRequest request = CatalogServicesRequest.newBuilder()
-					.setQueryParams(new QueryParams(this.properties.getCatalogServicesWatchTimeout(), index))
+			QueryParams queryParams = properties.queryParamsBuilder().setIndex(index).build();
+
+			CatalogServicesRequest request = CatalogServicesRequest.newBuilder().setQueryParams(queryParams)
 					.setToken(this.properties.getAclToken()).build();
 			Response<Map<String, List<String>>> response = this.consul.getCatalogServices(request);
 			Long consulIndex = response.getConsulIndex();
@@ -137,10 +150,75 @@ public class ConsulCatalogWatch implements ApplicationEventPublisherAware, Smart
 				log.trace("Received services update from consul: " + response.getValue() + ", index: " + consulIndex);
 			}
 			this.publisher.publishEvent(new HeartbeatEvent(this, consulIndex));
+			success = true;
 		}
 		catch (Exception e) {
 			log.error("Error watching Consul CatalogServices", e);
 		}
+		finally {
+			if (success) {
+				watchTrigger.markSuccess();
+			}
+			else {
+				watchTrigger.markFailure();
+			}
+		}
 	}
 
+	private static final class LongLivedExponentialBackOffTrigger implements Trigger {
+
+		private final ExponentialBackOff backOff;
+
+		BackOffExecution exec = null;
+
+		boolean lastRunFailed = false;
+
+		LongLivedExponentialBackOffTrigger(ExponentialBackOff backOff) {
+			this.backOff = backOff;
+		}
+
+		void markStart() {
+			// Reset the exponential clock on each successful start.
+			if (!lastRunFailed || this.exec == null) {
+				this.exec = backOff.start();
+			}
+		}
+
+		void markSuccess() {
+			lastRunFailed = false;
+		}
+
+		void markFailure() {
+			lastRunFailed = true;
+		}
+
+		@Override
+		public Instant nextExecution(TriggerContext triggerContext) {
+			Duration duration = nextDuration();
+			if (duration == null) {
+				return null;
+			}
+
+			if (duration.isZero()) {
+				return Instant.now(); // first time
+			}
+
+			return Instant.now().plus(duration);
+		}
+
+		private Duration nextDuration() {
+			if (!lastRunFailed) {
+				if (exec == null) {
+					return Duration.ZERO; // first time
+				}
+				// Linear backoff between successful calls.
+				return Duration.ofMillis(backOff.getInitialInterval());
+			}
+			long waitTimeout = exec.nextBackOff();
+			if (waitTimeout == BackOffExecution.STOP) {
+				return null;
+			}
+			return Duration.ofMillis(waitTimeout);
+		}
+	}
 }

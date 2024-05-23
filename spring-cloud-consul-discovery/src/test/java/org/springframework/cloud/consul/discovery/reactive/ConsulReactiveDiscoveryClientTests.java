@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.ecwid.consul.v1.ConsulClient;
+import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
 import com.ecwid.consul.v1.catalog.CatalogServicesRequest;
 import com.ecwid.consul.v1.health.HealthServicesRequest;
@@ -72,6 +73,7 @@ class ConsulReactiveDiscoveryClientTests {
 
 	@Test
 	public void shouldReturnEmptyFluxOfServicesWhenConsulFails() {
+		when(properties.queryParamsBuilder()).thenReturn(QueryParams.Builder.builder());
 		Flux<String> services = client.getServices();
 		when(consulClient.getCatalogServices(any(CatalogServicesRequest.class)))
 				.thenThrow(new RuntimeException("Possible runtime exception"));
@@ -81,6 +83,7 @@ class ConsulReactiveDiscoveryClientTests {
 
 	@Test
 	public void shouldReturnFluxOfServices() {
+		when(properties.queryParamsBuilder()).thenReturn(QueryParams.Builder.builder());
 		Flux<String> services = client.getServices();
 		when(consulClient.getCatalogServices(any(CatalogServicesRequest.class))).thenReturn(consulServicesResponse());
 		StepVerifier.create(services).expectNext("my-service").expectComplete().verify();
@@ -90,6 +93,7 @@ class ConsulReactiveDiscoveryClientTests {
 
 	@Test
 	public void shouldReturnFluxOfServicesWithAclToken() {
+		when(properties.queryParamsBuilder()).thenReturn(QueryParams.Builder.builder());
 		when(properties.getAclToken()).thenReturn("aclToken");
 		when(consulClient.getCatalogServices(any(CatalogServicesRequest.class))).thenReturn(consulServicesResponse());
 		Flux<String> services = client.getServices();
@@ -155,6 +159,7 @@ class ConsulReactiveDiscoveryClientTests {
 	private void configureCommonProperties() {
 		when(properties.getQueryTagsForService(anyString())).thenReturn(new String[] { "queryTag" });
 		when(properties.isQueryPassing()).thenReturn(false);
+		when(properties.queryParamsBuilder()).thenReturn(QueryParams.Builder.builder());
 	}
 
 	private Response<List<HealthService>> emptyConsulInstancesResponse() {

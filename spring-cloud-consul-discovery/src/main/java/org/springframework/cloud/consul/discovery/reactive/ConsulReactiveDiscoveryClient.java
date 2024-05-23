@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.ecwid.consul.v1.ConsulClient;
-import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
 import com.ecwid.consul.v1.catalog.CatalogServicesRequest;
 import com.ecwid.consul.v1.health.HealthServicesRequest;
@@ -77,7 +76,7 @@ public class ConsulReactiveDiscoveryClient implements ReactiveDiscoveryClient {
 
 	private List<HealthService> getHealthServices(String serviceId) {
 		HealthServicesRequest.Builder requestBuilder = HealthServicesRequest.newBuilder()
-				.setPassing(properties.isQueryPassing()).setQueryParams(QueryParams.DEFAULT)
+				.setQueryParams(properties.queryParamsBuilder().build()).setPassing(properties.isQueryPassing())
 				.setToken(properties.getAclToken());
 		String[] queryTags = properties.getQueryTagsForService(serviceId);
 		if (queryTags != null) {
@@ -93,8 +92,8 @@ public class ConsulReactiveDiscoveryClient implements ReactiveDiscoveryClient {
 	@Override
 	public Flux<String> getServices() {
 		return Flux.defer(() -> {
-			CatalogServicesRequest request = CatalogServicesRequest.newBuilder().setToken(properties.getAclToken())
-					.setQueryParams(QueryParams.DEFAULT).build();
+			CatalogServicesRequest request = CatalogServicesRequest.newBuilder()
+					.setQueryParams(properties.queryParamsBuilder().build()).setToken(properties.getAclToken()).build();
 			Response<Map<String, List<String>>> services = client.getCatalogServices(request);
 			return services == null ? Flux.empty() : Flux.fromIterable(services.getValue().keySet());
 		}).onErrorResume(exception -> {

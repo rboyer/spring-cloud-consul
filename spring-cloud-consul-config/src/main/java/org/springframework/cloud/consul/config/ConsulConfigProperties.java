@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.ecwid.consul.v1.ConsistencyMode;
+import com.ecwid.consul.v1.QueryParams;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -68,6 +70,11 @@ public class ConsulConfigProperties {
 	@Value("${consul.token:${CONSUL_TOKEN:${spring.cloud.consul.token:${SPRING_CLOUD_CONSUL_TOKEN:}}}}")
 	private String aclToken;
 
+	/**
+	 * Consistency mode for health service request.
+	 */
+	private ConsistencyMode consistencyMode = ConsistencyMode.DEFAULT;
+
 	private Watch watch = new Watch();
 
 	/**
@@ -88,6 +95,14 @@ public class ConsulConfigProperties {
 		if (this.format == Format.FILES) {
 			this.profileSeparator = "-";
 		}
+	}
+
+	/**
+	 * @return a QueryParams.Builder seeded with values from these properties.
+	 */
+	@NotNull
+	public QueryParams.Builder queryParamsBuilder() {
+		return QueryParams.Builder.builder().setConsistencyMode(consistencyMode).setWaitTime(watch.getWaitTime());
 	}
 
 	public boolean isEnabled() {
@@ -165,6 +180,14 @@ public class ConsulConfigProperties {
 		this.aclToken = aclToken;
 	}
 
+	public ConsistencyMode getConsistencyMode() {
+		return consistencyMode;
+	}
+
+	public void setConsistencyMode(ConsistencyMode consistencyMode) {
+		this.consistencyMode = consistencyMode;
+	}
+
 	public Watch getWatch() {
 		return this.watch;
 	}
@@ -194,7 +217,8 @@ public class ConsulConfigProperties {
 		return new ToStringCreator(this).append("enabled", this.enabled).append("prefixes", this.prefixes)
 				.append("defaultContext", this.defaultContext).append("profileSeparator", this.profileSeparator)
 				.append("format", this.format).append("dataKey", this.dataKey).append("aclToken", this.aclToken)
-				.append("watch", this.watch).append("failFast", this.failFast).append("name", this.name).toString();
+				.append("consistencyMode", this.consistencyMode).append("watch", this.watch)
+				.append("failFast", this.failFast).append("name", this.name).toString();
 	}
 
 	/**

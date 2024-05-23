@@ -45,7 +45,7 @@ public class TtlScheduler {
 
 	private static final Log log = LogFactory.getLog(TtlScheduler.class);
 
-	private final Map<String, ScheduledFuture> serviceHeartbeats = new ConcurrentHashMap<>();
+	private final Map<String, ScheduledFuture<?>> serviceHeartbeats = new ConcurrentHashMap<>();
 
 	private final TaskScheduler scheduler = new ConcurrentTaskScheduler(Executors.newSingleThreadScheduledExecutor());
 
@@ -82,17 +82,17 @@ public class TtlScheduler {
 	 * @param instanceId instance id
 	 */
 	public void add(String instanceId) {
-		ScheduledFuture task = this.scheduler.scheduleAtFixedRate(
+		ScheduledFuture<?> task = this.scheduler.scheduleAtFixedRate(
 				new ConsulHeartbeatTask(instanceId, this, () -> applicationStatusProvider.currentStatus()),
 				this.heartbeatProperties.computeHeartbeatInterval().toMillis());
-		ScheduledFuture previousTask = this.serviceHeartbeats.put(instanceId, task);
+		ScheduledFuture<?> previousTask = this.serviceHeartbeats.put(instanceId, task);
 		if (previousTask != null) {
 			previousTask.cancel(true);
 		}
 	}
 
 	public void remove(String instanceId) {
-		ScheduledFuture task = this.serviceHeartbeats.get(instanceId);
+		ScheduledFuture<?> task = this.serviceHeartbeats.get(instanceId);
 		if (task != null) {
 			task.cancel(true);
 		}

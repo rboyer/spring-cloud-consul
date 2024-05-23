@@ -19,6 +19,7 @@ package org.springframework.cloud.consul.binder;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.ecwid.consul.v1.ConsistencyMode;
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
@@ -42,6 +43,8 @@ public class EventService {
 	protected ObjectMapper objectMapper = new ObjectMapper();
 
 	private AtomicReference<Long> lastIndex = new AtomicReference<>();
+
+	private static final QueryParams STALE_QUERY = new QueryParams(ConsistencyMode.STALE);
 
 	public EventService(ConsulBinderProperties properties, ConsulClient consul, ObjectMapper objectMapper) {
 		this.properties = properties;
@@ -70,12 +73,12 @@ public class EventService {
 	}
 
 	public Event fire(String name, String payload) {
-		Response<Event> response = this.consul.eventFire(name, payload, new EventParams(), QueryParams.DEFAULT);
+		Response<Event> response = this.consul.eventFire(name, payload, new EventParams(), STALE_QUERY);
 		return response.getValue();
 	}
 
 	public Response<List<Event>> getEventsResponse() {
-		return this.consul.eventList(EventListRequest.newBuilder().setQueryParams(QueryParams.DEFAULT).build());
+		return this.consul.eventList(EventListRequest.newBuilder().setQueryParams(STALE_QUERY).build());
 	}
 
 	public List<Event> getEvents() {
@@ -100,8 +103,12 @@ public class EventService {
 		if (this.properties != null) {
 			eventTimeout = this.properties.getEventTimeout();
 		}
+
+		QueryParams queryParams = QueryParams.Builder.builder().setConsistencyMode(ConsistencyMode.STALE)
+				.setWaitTime(eventTimeout).setIndex(index).build();
+
 		Response<List<Event>> watch = this.consul
-				.eventList(EventListRequest.newBuilder().setQueryParams(new QueryParams(eventTimeout, index)).build());
+				.eventList(EventListRequest.newBuilder().setQueryParams(queryParams).build());
 		return filterEvents(readEvents(watch), lastIndex);
 	}
 

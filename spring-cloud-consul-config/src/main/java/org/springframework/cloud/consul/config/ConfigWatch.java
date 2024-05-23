@@ -23,7 +23,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.ecwid.consul.v1.ConsulClient;
-import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
 import com.ecwid.consul.v1.kv.model.GetValue;
 import io.micrometer.core.annotation.Timed;
@@ -130,6 +129,7 @@ public class ConfigWatch implements ApplicationEventPublisherAware, SmartLifecyc
 		if (!this.running.get()) {
 			return;
 		}
+
 		for (String context : this.consulIndexes.keySet()) {
 
 			// turn the context into a Consul folder path (unless our config format
@@ -155,7 +155,7 @@ public class ConfigWatch implements ApplicationEventPublisherAware, SmartLifecyc
 				}
 
 				Response<List<GetValue>> response = this.consul.getKVValues(context, aclToken,
-						new QueryParams(this.properties.getWatch().getWaitTime(), currentIndex));
+						properties.queryParamsBuilder().setIndex(currentIndex).build());
 
 				// if response.value == null, response was a 404, otherwise it was a
 				// 200, reducing churn if there wasn't anything

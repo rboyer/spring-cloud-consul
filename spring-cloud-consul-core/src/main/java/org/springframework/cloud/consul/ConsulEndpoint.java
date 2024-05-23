@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.ecwid.consul.v1.ConsistencyMode;
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
@@ -48,22 +49,24 @@ public class ConsulEndpoint {
 
 	@ReadOperation
 	public ConsulData invoke() {
+		QueryParams queryParams = new QueryParams(ConsistencyMode.STALE);
+
 		ConsulData data = new ConsulData();
 		// data.setKeyValues(kvClient.getKeyValueRecurse());
 		Response<Map<String, Service>> agentServices = this.consul.getAgentServices();
 		data.setAgentServices(agentServices.getValue());
 
 		Response<Map<String, List<String>>> catalogServices = this.consul
-				.getCatalogServices(CatalogServicesRequest.newBuilder().setQueryParams(QueryParams.DEFAULT).build());
+				.getCatalogServices(CatalogServicesRequest.newBuilder().setQueryParams(queryParams).build());
 
 		for (String serviceId : catalogServices.getValue().keySet()) {
 			Response<List<CatalogService>> response = this.consul.getCatalogService(serviceId,
-					CatalogServiceRequest.newBuilder().setQueryParams(QueryParams.DEFAULT).build());
+					CatalogServiceRequest.newBuilder().setQueryParams(queryParams).build());
 			data.getCatalogServices().put(serviceId, response.getValue());
 		}
 
 		Response<List<Node>> catalogNodes = this.consul
-				.getCatalogNodes(CatalogNodesRequest.newBuilder().setQueryParams(QueryParams.DEFAULT).build());
+				.getCatalogNodes(CatalogNodesRequest.newBuilder().setQueryParams(queryParams).build());
 		data.setCatalogNodes(catalogNodes.getValue());
 
 		return data;

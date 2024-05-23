@@ -112,9 +112,11 @@ public class ConsulServiceRegistry implements ServiceRegistry<ConsulRegistration
 
 	@Override
 	public Object getStatus(ConsulRegistration registration) {
+		QueryParams queryParams = properties.queryParamsBuilder().build();
+
 		String serviceId = registration.getServiceId();
 		Response<List<Check>> response = this.client.getHealthChecksForService(serviceId,
-				HealthChecksForServiceRequest.newBuilder().setQueryParams(QueryParams.DEFAULT).build());
+				HealthChecksForServiceRequest.newBuilder().setQueryParams(queryParams).build());
 		List<Check> checks = response.getValue();
 
 		for (Check check : checks) {

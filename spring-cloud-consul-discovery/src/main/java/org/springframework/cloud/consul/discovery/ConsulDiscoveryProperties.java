@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.ecwid.consul.v1.ConsistencyMode;
+import com.ecwid.consul.v1.QueryParams;
+import jakarta.validation.constraints.NotNull;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -121,6 +123,7 @@ public class ConsulDiscoveryProperties {
 	private boolean preferAgentAddress = false;
 
 	/** The delay between calls to watch consul catalog in millis, default is 1000. */
+	@Deprecated
 	private int catalogServicesWatchDelay = 1000;
 
 	/** The number of seconds to block while watching consul catalog, default is 2. */
@@ -425,10 +428,20 @@ public class ConsulDiscoveryProperties {
 		this.preferAgentAddress = preferAgentAddress;
 	}
 
+	/**
+	 * @return a QueryParams.Builder seeded with values from these properties.
+	 */
+	@NotNull
+	public QueryParams.Builder queryParamsBuilder() {
+		return QueryParams.Builder.builder().setConsistencyMode(consistencyMode).setWaitTime(catalogServicesWatchDelay);
+	}
+
+	@Deprecated
 	public int getCatalogServicesWatchDelay() {
 		return this.catalogServicesWatchDelay;
 	}
 
+	@Deprecated
 	public void setCatalogServicesWatchDelay(int catalogServicesWatchDelay) {
 		this.catalogServicesWatchDelay = catalogServicesWatchDelay;
 	}

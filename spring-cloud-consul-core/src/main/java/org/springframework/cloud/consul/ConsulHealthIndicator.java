@@ -19,6 +19,7 @@ package org.springframework.cloud.consul;
 import java.util.List;
 import java.util.Map;
 
+import com.ecwid.consul.v1.ConsistencyMode;
 import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.QueryParams;
 import com.ecwid.consul.v1.Response;
@@ -43,11 +44,13 @@ public class ConsulHealthIndicator extends AbstractHealthIndicator {
 
 	@Override
 	protected void doHealthCheck(Health.Builder builder) {
+		QueryParams queryParams = new QueryParams(ConsistencyMode.STALE);
+
 		final Response<String> leaderStatus = this.consul.getStatusLeader();
 		builder.up().withDetail("leader", leaderStatus.getValue());
 		if (properties.isIncludeServicesQuery()) {
-			final Response<Map<String, List<String>>> services = this.consul.getCatalogServices(
-					CatalogServicesRequest.newBuilder().setQueryParams(QueryParams.DEFAULT).build());
+			final Response<Map<String, List<String>>> services = this.consul
+					.getCatalogServices(CatalogServicesRequest.newBuilder().setQueryParams(queryParams).build());
 			builder.withDetail("services", services.getValue());
 		}
 	}
